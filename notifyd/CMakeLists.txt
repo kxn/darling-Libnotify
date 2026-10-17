@@ -12,6 +12,7 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 set(notifyd_sources
 	notifyd.c
+	mountwatch.c
 	notify_proc.c
 	pathwatch.c
 	service.c

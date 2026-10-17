@@ -1324,6 +1324,7 @@ main(int argc, const char *argv[])
 
 	xpc_event_publisher_t publisher = xpc_event_publisher_create("com.apple.notifyd.matching", global.workloop);
 	global.notify_state.event_publisher = publisher;
+    if (publisher != NULL) {
 	xpc_event_publisher_set_handler(publisher,
 			^(xpc_event_publisher_action_t action, uint64_t event_token, xpc_object_t descriptor) {
 				switch (action) {
@@ -1347,6 +1348,15 @@ main(int argc, const char *argv[])
 		NOTIFY_INTERNAL_CRASH(error, "Event publisher error");
 	});
 	xpc_event_publisher_activate(publisher);
+
+    } else {
+        // The Darling XPC event-publisher backend is unavailable. Direct Mach
+        // notification registration is independent of that optional transport;
+        // start its real listeners without inventing an XPC initial barrier.
+        fprintf(stderr, "notifyd: XPC matching publisher unavailable; direct Mach notification transport active\n");
+        dispatch_mach_connect(global.mach_notifs_channel, global.mach_notify_port, MACH_PORT_NULL, NULL);
+        dispatch_mach_connect(global.mach_channel, global.server_port, MACH_PORT_NULL, NULL);
+    }
 
 	/* Set up SIGUSR1 */
 	global.sig_usr1_src = dispatch_source_create(DISPATCH_SOURCE_TYPE_SIGNAL,
@@ -1385,5 +1395,9 @@ main(int argc, const char *argv[])
 	dispatch_activate(global.stat_reset_src);
 	notify_reset_stats();
 
+#ifdef DARLING
+	extern void darling_mountwatch_start(dispatch_queue_t);
+	darling_mountwatch_start(global.workloop);
+#endif
 	dispatch_main();
 }
